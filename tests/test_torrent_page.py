@@ -48,3 +48,10 @@ def test_torrent_panel_reuses_blank_canvas_without_replacing_blank_page() -> Non
     assert get_page_class_for_panel("torrent") is TorrentPage
     assert get_page_id_for_panel("torrent") == 1
     assert get_page_id_for_panel("blank") == 1
+
+
+def test_torrent_chart_command_budget_fits_original_nextion_buffer() -> None:
+    # Two series use SAMPLE_COUNT - 1 line commands each.  The chart also
+    # sends three clears, five grid lines, five labels and three footer labels.
+    command_count = 2 * (TorrentPage.SAMPLE_COUNT - 1) + 16
+    assert command_count <= 64

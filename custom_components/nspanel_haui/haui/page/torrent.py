@@ -106,9 +106,10 @@ class TorrentPage(HAUIPage):
     CHART_TOP = 112
     CHART_RIGHT = 470
     CHART_BOTTOM = 263
-    # Forty-eight points keep the graph detailed while bounding the serial
-    # command batches sent to the original NSPanel display.
-    SAMPLE_COUNT = 48
+    # Twenty-four points retain useful 30-minute resolution over the default
+    # 12-hour window while keeping a complete chart redraw below the original
+    # Nextion display's small serial receive buffer.
+    SAMPLE_COUNT = 24
 
     def prepare(self) -> None:
         self._download_entity = ""
@@ -119,6 +120,7 @@ class TorrentPage(HAUIPage):
         self._chart_refresh_seconds = 60
         self._live_timer: Any = None
         self._chart_timer: Any = None
+        self._initial_chart_timer: Any = None
 
     def start_panel(self, panel: HAUIPanel) -> None:
         self._download_entity = self._entity_id(panel.get("download_entity", ""))
@@ -145,19 +147,27 @@ class TorrentPage(HAUIPage):
             f"now+{self._chart_refresh_seconds}",
             self._chart_refresh_seconds,
         )
+        # set_panel records the initial render as one batch.  Drawing the
+        # chart in that same batch can exceed the original Nextion RX buffer,
+        # so let the compact header/live batch drain before sending the chart.
+        self._initial_chart_timer = self.app.run_in(self._draw_initial_chart, 1)
 
     def render_panel(self, panel: HAUIPanel) -> None:
         self.send_cmd(f"cls {self.COLOR_BACKGROUND}")
         self._draw_static(panel.get_title("TORRENTS"))
         self._draw_live()
-        self._draw_chart()
 
     def _stop_panel(self, panel: HAUIPanel) -> None:
-        for attr in ("_live_timer", "_chart_timer"):
+        for attr in ("_live_timer", "_chart_timer", "_initial_chart_timer"):
             handle = getattr(self, attr)
             if handle is not None:
                 self.app.cancel_timer(handle)
                 setattr(self, attr, None)
+
+    def _draw_initial_chart(self, _data: dict | None = None) -> None:
+        self._initial_chart_timer = None
+        if self.panel is not None:
+            self._draw_chart()
 
     def callback_refresh(self, event: HAUIEvent, component: tuple) -> None:
         if self.panel is not None:

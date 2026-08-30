@@ -41,6 +41,7 @@ def test_nice_scale_leaves_chart_headroom() -> None:
 def test_xstr_sanitizes_nextion_string() -> None:
     command = TorrentPage._xstr(0, 0, 100, 20, 1, 65535, 0, 'A "quote" \\ path')
     assert "\"A 'quote' / path\"" in command
+    assert ',0,0,1,1,"' in command
 
 
 def test_torrent_panel_reuses_blank_canvas_without_replacing_blank_page() -> None:

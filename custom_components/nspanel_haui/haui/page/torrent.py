@@ -273,10 +273,21 @@ class TorrentPage(HAUIPage):
         scale = self._nice_scale(max(download + upload, default=0.0))
 
         with self.rec_cmd:
+            # Clear every area touched by the dynamic chart.  The original
+            # NSPanel Nextion display retains pixels between redraws, so only
+            # clearing the plot rectangle leaves stale axis/footer glyphs.
+            self.send_cmd(
+                f"fill 0,{self.CHART_TOP - 8},{self.CHART_LEFT},"
+                f"{self.CHART_BOTTOM - self.CHART_TOP + 17},{self.COLOR_BACKGROUND}"
+            )
             self.send_cmd(
                 f"fill {self.CHART_LEFT},{self.CHART_TOP},"
                 f"{self.CHART_RIGHT - self.CHART_LEFT + 1},"
                 f"{self.CHART_BOTTOM - self.CHART_TOP + 1},{self.COLOR_BACKGROUND}"
+            )
+            self.send_cmd(
+                f"fill 0,{self.CHART_BOTTOM + 1},480,"
+                f"{320 - self.CHART_BOTTOM - 1},{self.COLOR_BACKGROUND}"
             )
             for index in range(5):
                 y = self.CHART_TOP + round(index * (self.CHART_BOTTOM - self.CHART_TOP) / 4)
@@ -409,6 +420,9 @@ class TorrentPage(HAUIPage):
         align: int = 0,
     ) -> str:
         safe = str(text).replace('"', "'").replace("\\", "/")[:80]
+        # sta=1 is solid-color mode.  sta=0 is crop-image mode and copies
+        # pixels from the page background, which produces corrupted text
+        # boxes on the runtime-drawn blank canvas after repeated refreshes.
         return (
-            f'xstr {x},{y},{width},{height},{font},{text_color},{back_color},{align},1,0,"{safe}"'
+            f'xstr {x},{y},{width},{height},{font},{text_color},{back_color},{align},1,1,"{safe}"'
         )

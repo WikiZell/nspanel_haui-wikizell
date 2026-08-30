@@ -18,6 +18,7 @@ from ..page.select import SelectPage
 from ..page.settings import SettingsPage
 from ..page.system import SystemPage
 from ..page.timer import TimerPage
+from ..page.torrent import TorrentPage
 from ..page.unlock import UnlockPage
 from ..page.vacuum import VacuumPage
 from ..page.weather import WeatherPage
@@ -44,6 +45,7 @@ _page_classes: list[type] = [
     SettingsPage,
     SystemPage,
     TimerPage,
+    TorrentPage,
     UnlockPage,
     VacuumPage,
     WeatherPage,

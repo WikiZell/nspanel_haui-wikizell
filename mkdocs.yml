@@ -96,6 +96,7 @@ nav:
       - Cover: panels/panel_cover.md
       - Climate: panels/panel_climate.md
       - Timer: panels/panel_timer.md
+      - Torrents: panels/panel_torrent.md
       - Alarm: panels/panel_alarm.md
       - About: panels/panel_about.md
       - Blank: panels/panel_blank.md

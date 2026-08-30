@@ -7,7 +7,7 @@ description: Overview of all available panel types for NSPanel HAUI
 
 All panels are configured through the visual editor in Home Assistant. See the [Configuration Overview](../configuration/README.md) for how to use the editor.
 
-NSPanel HAUI supports **13 panel types** plus **system panels** and **popups**. Panels are categorized by purpose:
+NSPanel HAUI supports **14 panel types** plus **system panels** and **popups**. Panels are categorized by purpose:
 
 - **Entity Controls** — Control a single Home Assistant entity (light, climate, cover, etc.)
 - **Multi-Entity** — Display and control multiple entities at once
@@ -63,6 +63,7 @@ Special-purpose panels for non-entity functions.
 | <a href="panel_timer.md"><img src="../assets/previews/panel-timer.svg" width="80" height="60"></a> | [Timer](panel_timer.md) | `timer` | Local countdown timer with start/pause/stop. Display-local time, no HA entity needed. |
 | <a href="panel_qr.md"><img src="../assets/previews/panel-qr.svg" width="80" height="60"></a> | [QR Code](panel_qr.md) | `qr` | Display QR codes for Wi-Fi details, URLs, or custom text. |
 | <a href="panel_alarm.md"><img src="../assets/previews/panel-alarm.svg" width="80" height="60"></a> | [Alarm](panel_alarm.md) | `alarm` | Numeric keypad for alarm code entry. Arm/disarm with mode buttons. |
+| — | [Torrents](panel_torrent.md) | `torrent` | Live qBittorrent speeds, counters, and a recorder-backed bandwidth history chart. |
 
 ---
 

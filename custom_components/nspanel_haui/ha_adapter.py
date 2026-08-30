@@ -9,7 +9,8 @@ import asyncio
 import logging
 import uuid
 from collections.abc import Callable
-from typing import Any
+from datetime import datetime
+from typing import Any, cast
 
 from .haui.mapping.const import ESPAction, NotificationAction
 
@@ -446,6 +447,52 @@ class HAAdapter:
         """
         s = self.hass.states.get(entity_id)
         return s.state if s else None
+
+    def get_history(
+        self,
+        entity_ids: list[str],
+        start_time: datetime,
+        end_time: datetime,
+    ) -> dict[str, list[tuple[float, str]]]:
+        """Return recorder state history for entities in a transport-neutral form.
+
+        Recorder queries must run on Home Assistant's dedicated database executor.
+        Page code stays independent of Home Assistant internals by receiving only
+        ``(unix_timestamp, state)`` tuples.
+        """
+
+        async def _fetch() -> dict[str, list[tuple[float, str]]]:
+            from homeassistant.components.recorder import get_instance  # noqa: PLC0415
+            from homeassistant.components.recorder.history import (  # noqa: PLC0415
+                get_significant_states,
+            )
+
+            recorder = get_instance(self.hass)
+            states = await recorder.async_add_executor_job(
+                get_significant_states,
+                self.hass,
+                start_time,
+                end_time,
+                entity_ids,
+                None,
+                True,
+                False,
+                False,
+                True,
+            )
+            typed_states = cast(dict[str, list[Any]], states)
+            return {
+                entity_id: [
+                    (state.last_updated.timestamp(), state.state) for state in entity_states
+                ]
+                for entity_id, entity_states in typed_states.items()
+            }
+
+        try:
+            return asyncio.run_coroutine_threadsafe(_fetch(), self._loop).result(timeout=30)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Recorder history query failed: %s", exc)
+            return {}
 
     def get_item(self, entity_id: str) -> ItemProxy:
         return ItemProxy(self.hass, self._loop, entity_id, proxy=self)

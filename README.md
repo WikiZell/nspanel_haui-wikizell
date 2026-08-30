@@ -67,7 +67,7 @@ Get NSPanel HAUI up and running with a display dashboard in just 4 steps:
   <tr>
     <td align="center" valign="top" width="16%">
       <img src="https://cdn.jsdelivr.net/npm/@mdi/svg@7/svg/view-grid.svg" width="32" height="32"><br>
-      <b>13 Panel Types</b><br>
+      <b>14 Panel Types</b><br>
       <small>Grid, light, climate,<br>cover, media, weather,<br>and more</small>
     </td>
     <td align="center" valign="top" width="16%">
@@ -211,7 +211,10 @@ See the <a href="docs/panels/README.md">Panels Overview</a> for details.
       <b><a href="docs/panels/panel_clocktwo.md">ClockTwo</a></b> <code>clocktwo</code><br>
       <small>Time displayed as written text. Minimalist screensaver alternative.</small>
     </td>
-    <td width="33%" valign="top"></td>
+    <td width="33%" valign="top">
+      <b><a href="docs/panels/panel_torrent.md">Torrents</a></b> <code>torrent</code><br>
+      <small>qBittorrent live speeds, counters, and a 12-hour bandwidth history chart.</small>
+    </td>
     <td width="33%" valign="top"></td>
   </tr>
 </table>

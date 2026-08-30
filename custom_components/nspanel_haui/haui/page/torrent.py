@@ -110,6 +110,8 @@ class TorrentPage(HAUIPage):
     # 12-hour window while keeping a complete chart redraw below the original
     # Nextion display's small serial receive buffer.
     SAMPLE_COUNT = 24
+    CHART_CHUNK_SIZE = 6
+    CHART_CHUNK_DELAY = 0.2
 
     def prepare(self) -> None:
         self._download_entity = ""
@@ -121,6 +123,7 @@ class TorrentPage(HAUIPage):
         self._live_timer: Any = None
         self._chart_timer: Any = None
         self._initial_chart_timer: Any = None
+        self._chart_chunk_timers: list[Any] = []
 
     def start_panel(self, panel: HAUIPanel) -> None:
         self._download_entity = self._entity_id(panel.get("download_entity", ""))
@@ -163,6 +166,7 @@ class TorrentPage(HAUIPage):
             if handle is not None:
                 self.app.cancel_timer(handle)
                 setattr(self, attr, None)
+        self._cancel_chart_chunks()
 
     def _draw_initial_chart(self, _data: dict | None = None) -> None:
         self._initial_chart_timer = None
@@ -282,42 +286,36 @@ class TorrentPage(HAUIPage):
             upload = [self._read_float(self._upload_entity)] * self.SAMPLE_COUNT
         scale = self._nice_scale(max(download + upload, default=0.0))
 
-        with self.rec_cmd:
-            # Clear every area touched by the dynamic chart.  The original
-            # NSPanel Nextion display retains pixels between redraws, so only
-            # clearing the plot rectangle leaves stale axis/footer glyphs.
-            self.send_cmd(
-                f"fill 0,{self.CHART_TOP - 8},{self.CHART_LEFT},"
-                f"{self.CHART_BOTTOM - self.CHART_TOP + 17},{self.COLOR_BACKGROUND}"
-            )
-            self.send_cmd(
-                f"fill {self.CHART_LEFT},{self.CHART_TOP},"
-                f"{self.CHART_RIGHT - self.CHART_LEFT + 1},"
-                f"{self.CHART_BOTTOM - self.CHART_TOP + 1},{self.COLOR_BACKGROUND}"
-            )
-            self.send_cmd(
-                f"fill 0,{self.CHART_BOTTOM + 1},480,"
-                f"{320 - self.CHART_BOTTOM - 1},{self.COLOR_BACKGROUND}"
-            )
-            for index in range(5):
-                y = self.CHART_TOP + round(index * (self.CHART_BOTTOM - self.CHART_TOP) / 4)
-                self.send_cmd(
-                    f"line {self.CHART_LEFT},{y},{self.CHART_RIGHT},{y},{self.COLOR_GRID}"
+        # A single ESPHome send_commands call writes every command to the
+        # Nextion immediately.  Even a reduced chart can overflow this early
+        # NSPanel display, so build the frame first and pace it in tiny chunks.
+        commands = [
+            f"fill 0,{self.CHART_TOP - 8},{self.CHART_LEFT},"
+            f"{self.CHART_BOTTOM - self.CHART_TOP + 17},{self.COLOR_BACKGROUND}",
+            f"fill {self.CHART_LEFT},{self.CHART_TOP},"
+            f"{self.CHART_RIGHT - self.CHART_LEFT + 1},"
+            f"{self.CHART_BOTTOM - self.CHART_TOP + 1},{self.COLOR_BACKGROUND}",
+            f"fill 0,{self.CHART_BOTTOM + 1},480,"
+            f"{320 - self.CHART_BOTTOM - 1},{self.COLOR_BACKGROUND}",
+        ]
+        for index in range(5):
+            y = self.CHART_TOP + round(index * (self.CHART_BOTTOM - self.CHART_TOP) / 4)
+            commands.append(f"line {self.CHART_LEFT},{y},{self.CHART_RIGHT},{y},{self.COLOR_GRID}")
+            label = self._format_scale(scale * (4 - index) / 4)
+            commands.append(
+                self._xstr(
+                    0, y - 8, self.CHART_LEFT - 3, 16, 0, self.COLOR_MUTED, 0, label, align=2
                 )
-                label = self._format_scale(scale * (4 - index) / 4)
-                self.send_cmd(
-                    self._xstr(
-                        0, y - 8, self.CHART_LEFT - 3, 16, 0, self.COLOR_MUTED, 0, label, align=2
-                    )
-                )
-            self._draw_series(download, scale, self.COLOR_DOWNLOAD)
-            self._draw_series(upload, scale, self.COLOR_UPLOAD)
-            self.send_cmd(
-                self._xstr(8, 270, 100, 18, 0, self.COLOR_MUTED, 0, f"-{self._history_hours}h")
             )
-            self.send_cmd(self._xstr(211, 270, 60, 18, 0, self.COLOR_MUTED, 0, "now", align=1))
-            self.send_cmd(self._xstr(340, 270, 128, 18, 0, self.COLOR_MUTED, 0, "MB/s", align=2))
-            self.send_cmd(
+        commands.extend(self._series_commands(download, scale, self.COLOR_DOWNLOAD))
+        commands.extend(self._series_commands(upload, scale, self.COLOR_UPLOAD))
+        commands.extend(
+            [
+                self._xstr(
+                    8, 270, 100, 18, 0, self.COLOR_MUTED, 0, f"-{self._history_hours}h"
+                ),
+                self._xstr(211, 270, 60, 18, 0, self.COLOR_MUTED, 0, "now", align=1),
+                self._xstr(340, 270, 128, 18, 0, self.COLOR_MUTED, 0, "MB/s", align=2),
                 self._xstr(
                     8,
                     296,
@@ -328,10 +326,12 @@ class TorrentPage(HAUIPage):
                     0,
                     "Tap to refresh  |  Swipe to navigate",
                     align=1,
-                )
-            )
+                ),
+            ]
+        )
+        self._queue_chart_commands(commands)
 
-    def _draw_series(self, values: list[float], scale: float, color: int) -> None:
+    def _series_commands(self, values: list[float], scale: float, color: int) -> list[str]:
         width = self.CHART_RIGHT - self.CHART_LEFT
         height = self.CHART_BOTTOM - self.CHART_TOP
         points = [
@@ -341,8 +341,35 @@ class TorrentPage(HAUIPage):
             )
             for index, value in enumerate(values)
         ]
-        for (x1, y1), (x2, y2) in zip(points, points[1:], strict=False):
-            self.send_cmd(f"line {x1},{y1},{x2},{y2},{color}")
+        return [
+            f"line {x1},{y1},{x2},{y2},{color}"
+            for (x1, y1), (x2, y2) in zip(points, points[1:], strict=False)
+        ]
+
+    def _queue_chart_commands(self, commands: list[str]) -> None:
+        self._cancel_chart_chunks()
+        chunks = [
+            commands[index : index + self.CHART_CHUNK_SIZE]
+            for index in range(0, len(commands), self.CHART_CHUNK_SIZE)
+        ]
+        if not chunks:
+            return
+        self.send_cmds(chunks[0])
+        for index, chunk in enumerate(chunks[1:], start=1):
+            handle = self.app.run_in(
+                lambda _data, chart_chunk=chunk: self._send_chart_chunk(chart_chunk),
+                index * self.CHART_CHUNK_DELAY,
+            )
+            self._chart_chunk_timers.append(handle)
+
+    def _send_chart_chunk(self, commands: list[str]) -> None:
+        if self.panel is not None:
+            self.send_cmds(commands)
+
+    def _cancel_chart_chunks(self) -> None:
+        for handle in self._chart_chunk_timers:
+            self.app.cancel_timer(handle)
+        self._chart_chunk_timers = []
 
     def _sample_series(
         self, points: list[tuple[float, str]], start_ts: float, end_ts: float

@@ -55,3 +55,31 @@ def test_torrent_chart_command_budget_fits_original_nextion_buffer() -> None:
     # sends three clears, five grid lines, five labels and three footer labels.
     command_count = 2 * (TorrentPage.SAMPLE_COUNT - 1) + 16
     assert command_count <= 64
+    assert TorrentPage.CHART_CHUNK_SIZE <= 6
+    assert TorrentPage.CHART_CHUNK_DELAY >= 0.2
+
+
+def test_chart_commands_are_paced_in_small_chunks() -> None:
+    page = _page()
+    page.CHART_CHUNK_SIZE = 2
+    page.CHART_CHUNK_DELAY = 0.25
+    page._chart_chunk_timers = []
+    sent: list[list[str]] = []
+    scheduled: list[tuple[object, float]] = []
+
+    class FakeApp:
+        def run_in(self, callback: object, delay: float) -> str:
+            scheduled.append((callback, delay))
+            return f"timer-{len(scheduled)}"
+
+        def cancel_timer(self, _handle: str) -> None:
+            pass
+
+    page.app = FakeApp()  # type: ignore[assignment]
+    page.send_cmds = sent.append  # type: ignore[method-assign]
+
+    page._queue_chart_commands(["a", "b", "c", "d", "e"])
+
+    assert sent == [["a", "b"]]
+    assert [delay for _, delay in scheduled] == [0.25, 0.5]
+    assert page._chart_chunk_timers == ["timer-1", "timer-2"]

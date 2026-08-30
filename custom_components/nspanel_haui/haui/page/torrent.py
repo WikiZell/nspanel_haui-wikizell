@@ -102,10 +102,14 @@ class TorrentPage(HAUIPage):
     COLOR_TEXT = 65535
     COLOR_DOWNLOAD = 2047
     COLOR_UPLOAD = 2016
-    CHART_LEFT = 39
-    CHART_TOP = 112
-    CHART_RIGHT = 470
-    CHART_BOTTOM = 263
+    # The original NSPanel EU bezel hides roughly 20-30 pixels of the LCD on
+    # each horizontal edge.  Keep all meaningful content inside this aperture.
+    SAFE_LEFT = 24
+    SAFE_RIGHT = 444
+    CHART_LEFT = 54
+    CHART_TOP = 116
+    CHART_RIGHT = SAFE_RIGHT
+    CHART_BOTTOM = 258
     # Twenty-four points retain useful 30-minute resolution over the default
     # 12-hour window while keeping a complete chart redraw below the original
     # Nextion display's small serial receive buffer.
@@ -189,15 +193,28 @@ class TorrentPage(HAUIPage):
     def _draw_static(self, title: str) -> None:
         with self.rec_cmd:
             self.send_cmd(f"fill 0,0,480,106,{self.COLOR_PANEL}")
-            self.send_cmd(self._xstr(12, 7, 456, 28, 2, self.COLOR_TEXT, self.COLOR_PANEL, title))
-            self.send_cmd(f"line 10,40,470,40,{self.COLOR_GRID}")
             self.send_cmd(
                 self._xstr(
-                    12,
-                    86,
-                    300,
-                    20,
-                    1,
+                    self.SAFE_LEFT,
+                    6,
+                    self.SAFE_RIGHT - self.SAFE_LEFT,
+                    28,
+                    2,
+                    self.COLOR_TEXT,
+                    self.COLOR_PANEL,
+                    title,
+                )
+            )
+            self.send_cmd(
+                f"line {self.SAFE_LEFT},38,{self.SAFE_RIGHT},38,{self.COLOR_GRID}"
+            )
+            self.send_cmd(
+                self._xstr(
+                    self.SAFE_LEFT,
+                    90,
+                    250,
+                    18,
+                    0,
                     self.COLOR_MUTED,
                     self.COLOR_PANEL,
                     f"BANDWIDTH HISTORY ({self._history_hours}H)",
@@ -205,28 +222,28 @@ class TorrentPage(HAUIPage):
             )
             self.send_cmd(
                 self._xstr(
-                    318,
-                    86,
-                    150,
-                    20,
-                    1,
+                    330,
+                    90,
+                    60,
+                    18,
+                    0,
                     self.COLOR_DOWNLOAD,
                     self.COLOR_PANEL,
                     "DOWN",
-                    align=2,
+                    align=1,
                 )
             )
             self.send_cmd(
                 self._xstr(
-                    405,
-                    86,
-                    63,
-                    20,
-                    1,
+                    400,
+                    90,
+                    44,
+                    18,
+                    0,
                     self.COLOR_UPLOAD,
                     self.COLOR_PANEL,
                     "UP",
-                    align=2,
+                    align=1,
                 )
             )
 
@@ -237,35 +254,42 @@ class TorrentPage(HAUIPage):
             f"{label} {self._read_text(entity)}" for label, entity in self._counter_entities.items()
         ]
         with self.rec_cmd:
-            self.send_cmd(f"fill 0,41,480,44,{self.COLOR_PANEL}")
+            self.send_cmd(f"fill 0,39,480,51,{self.COLOR_PANEL}")
             self.send_cmd(
                 self._xstr(
-                    12,
-                    44,
-                    210,
-                    34,
+                    self.SAFE_LEFT,
+                    42,
+                    190,
+                    28,
                     2,
                     self.COLOR_DOWNLOAD,
                     self.COLOR_PANEL,
-                    f"D {download:.2f} MB/s",
+                    f"D {download:.1f} MB/s",
                 )
             )
             self.send_cmd(
                 self._xstr(
-                    250,
-                    44,
-                    218,
-                    34,
+                    244,
+                    42,
+                    200,
+                    28,
                     2,
                     self.COLOR_UPLOAD,
                     self.COLOR_PANEL,
-                    f"U {upload:.2f} MB/s",
+                    f"U {upload:.1f} MB/s",
                     align=2,
                 )
             )
             self.send_cmd(
                 self._xstr(
-                    12, 74, 456, 18, 1, self.COLOR_MUTED, self.COLOR_PANEL, "   ".join(counters)
+                    self.SAFE_LEFT,
+                    71,
+                    self.SAFE_RIGHT - self.SAFE_LEFT,
+                    17,
+                    0,
+                    self.COLOR_MUTED,
+                    self.COLOR_PANEL,
+                    "  ".join(counters),
                 )
             )
 
@@ -304,7 +328,15 @@ class TorrentPage(HAUIPage):
             label = self._format_scale(scale * (4 - index) / 4)
             commands.append(
                 self._xstr(
-                    0, y - 8, self.CHART_LEFT - 3, 16, 0, self.COLOR_MUTED, 0, label, align=2
+                    self.SAFE_LEFT,
+                    y - 8,
+                    self.CHART_LEFT - self.SAFE_LEFT - 4,
+                    16,
+                    0,
+                    self.COLOR_MUTED,
+                    0,
+                    label,
+                    align=2,
                 )
             )
         commands.extend(self._series_commands(download, scale, self.COLOR_DOWNLOAD))
@@ -312,14 +344,21 @@ class TorrentPage(HAUIPage):
         commands.extend(
             [
                 self._xstr(
-                    8, 270, 100, 18, 0, self.COLOR_MUTED, 0, f"-{self._history_hours}h"
+                    self.SAFE_LEFT,
+                    266,
+                    70,
+                    18,
+                    0,
+                    self.COLOR_MUTED,
+                    0,
+                    f"-{self._history_hours}h",
                 ),
-                self._xstr(211, 270, 60, 18, 0, self.COLOR_MUTED, 0, "now", align=1),
-                self._xstr(340, 270, 128, 18, 0, self.COLOR_MUTED, 0, "MB/s", align=2),
+                self._xstr(210, 266, 60, 18, 0, self.COLOR_MUTED, 0, "now", align=1),
+                self._xstr(386, 266, 58, 18, 0, self.COLOR_MUTED, 0, "MB/s", align=2),
                 self._xstr(
-                    8,
-                    296,
-                    460,
+                    self.SAFE_LEFT,
+                    293,
+                    self.SAFE_RIGHT - self.SAFE_LEFT,
                     18,
                     0,
                     self.COLOR_MUTED,

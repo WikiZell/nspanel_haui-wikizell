@@ -59,6 +59,13 @@ def test_torrent_chart_command_budget_fits_original_nextion_buffer() -> None:
     assert TorrentPage.CHART_CHUNK_DELAY >= 0.2
 
 
+def test_torrent_layout_stays_inside_original_nspanel_bezel() -> None:
+    assert TorrentPage.SAFE_LEFT >= 20
+    assert TorrentPage.SAFE_RIGHT <= 448
+    assert TorrentPage.CHART_LEFT >= TorrentPage.SAFE_LEFT + 24
+    assert TorrentPage.CHART_RIGHT <= TorrentPage.SAFE_RIGHT
+
+
 def test_chart_commands_are_paced_in_small_chunks() -> None:
     page = _page()
     page.CHART_CHUNK_SIZE = 2
